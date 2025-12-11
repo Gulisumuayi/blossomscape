@@ -16,6 +16,14 @@ scene.add(light);
 
 scene.add(new THREE.AmbientLight(0x444444));
 
+// --- Ground plane ---
+const groundGeo = new THREE.PlaneGeometry(100, 100);
+const groundMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+
+// --- Flower setup ---
 const flowers = [];
 const colors = [0xff99dd, 0xffdd66, 0x99ddff, 0xccffcc];
 
@@ -45,13 +53,24 @@ function createFlower(x, y, z) {
   flowers.push(group);
 }
 
-canvas.addEventListener('click', (e) => {
-  const x = (Math.random() - 0.5) * 10;
-  const y = Math.random() * 2;
-  const z = (Math.random() - 0.5) * 10;
-  createFlower(x, y, z);
+// --- Raycasting to detect click position ---
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+canvas.addEventListener('click', (event) => {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObject(ground);
+
+  if (intersects.length > 0) {
+    const point = intersects[0].point;
+    createFlower(point.x, 0, point.z);
+  }
 });
 
+// --- Resize handling ---
 window.addEventListener('resize', () => {
   const w = window.innerWidth;
   const h = window.innerHeight;
@@ -60,6 +79,7 @@ window.addEventListener('resize', () => {
   renderer.setSize(w, h);
 });
 
+// --- Animation ---
 function animate() {
   requestAnimationFrame(animate);
 
@@ -72,3 +92,4 @@ function animate() {
 }
 
 animate();
+
