@@ -49,9 +49,9 @@ const riverMat = new THREE.MeshPhongMaterial({
   side: THREE.DoubleSide
 });
 
-const river = new THREE.Mesh(new THREE.PlaneGeometry(20, 4), riverMat);
+const river = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), riverMat);
 river.rotation.x = -Math.PI / 2;
-river.position.set(0, 0.011, 0); // slightly above ground
+river.position.set(-10, 0.011, 0);// slightly above ground
 scene.add(river);
 
 
@@ -146,11 +146,19 @@ function animate() {
 
   flowers.forEach((f, i) => {
     const t = Date.now() * 0.001 + i;
-    f.children[1].scale.setScalar(1 + 0.2 * Math.sin(t));
+    const blossom = f.children[0]; // assuming `flower` is added as group.children[0]
+    if (blossom) {
+      blossom.children.forEach(child => {
+        // Only animate petals, not the stem or center
+        if (child.type === 'Mesh' && child.geometry.type === 'ExtrudeGeometry') {
+          child.scale.setScalar(1 + 0.2 * Math.sin(t));
+        }
+      });
+    }
   });
-  
+
   waterTex.offset.x += 0.002;
-  
+
   renderer.render(scene, camera);
 }
 
