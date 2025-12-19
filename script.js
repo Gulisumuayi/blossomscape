@@ -7,6 +7,20 @@ renderer.setPixelRatio(window.devicePixelRatio);
 
 const scene = new THREE.Scene();
 
+// Create gradient sky background using canvas texture
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 2;
+skyCanvas.height = 2;
+const ctx = skyCanvas.getContext('2d');
+const gradient = ctx.createLinearGradient(0, 0, 0, 2);
+gradient.addColorStop(0, '#1a1a2e'); // dark top
+gradient.addColorStop(1, '#3c3c6e'); // soft horizon
+ctx.fillStyle = gradient;
+ctx.fillRect(0, 0, 2, 2);
+
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+scene.background = skyTexture;
+
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
 camera.position.set(0, 2, 8);
 
@@ -23,32 +37,79 @@ const ground = new THREE.Mesh(groundGeo, groundMat);
 ground.rotation.x = -Math.PI / 2;
 scene.add(ground);
 
+// --- Flowing river plane ---
+const waterTex = new THREE.TextureLoader().load('https://threejsfundamentals.org/threejs/resources/images/water.jpg');
+waterTex.wrapS = waterTex.wrapT = THREE.RepeatWrapping;
+waterTex.repeat.set(4, 1);
+
+const riverMat = new THREE.MeshPhongMaterial({
+  map: waterTex,
+  transparent: true,
+  opacity: 0.6,
+  side: THREE.DoubleSide
+});
+
+const river = new THREE.Mesh(new THREE.PlaneGeometry(20, 4), riverMat);
+river.rotation.x = -Math.PI / 2;
+river.position.set(0, 0.011, 0); // slightly above ground
+scene.add(river);
+
+
 // --- Flower setup ---
 const flowers = [];
 const colors = [0xff99dd, 0xffdd66, 0x99ddff, 0xccffcc];
 
 function createFlower(x, y, z) {
+  const group = new THREE.Group();
+
+  // Define petal shape (teardrop using Bezier curves)
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0);
+  shape.bezierCurveTo(0.5, 1.5, 1.5, 1.5, 0, 3);
+  shape.bezierCurveTo(-1.5, 1.5, -0.5, 1.5, 0, 0);
+
+  const extrudeSettings = { depth: 0.1, bevelEnabled: false };
+  const petalGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+  const petalMat = new THREE.MeshPhongMaterial({
+    color: colors[Math.floor(Math.random() * colors.length)],
+    side: THREE.DoubleSide
+  });
+
+  const flower = new THREE.Group();
+  const layers = [
+    { count: 5, radius: 1.2 },
+    { count: 4, radius: 0.8, scale: 0.8, offset: Math.PI / 4 }
+  ];
+
+  layers.forEach(layer => {
+    for (let i = 0; i < layer.count; i++) {
+      const angle = (2 * Math.PI * i) / layer.count + (layer.offset || 0);
+      const petal = new THREE.Mesh(petalGeom, petalMat);
+      petal.scale.setScalar(layer.scale || 1);
+      petal.position.set(Math.cos(angle) * layer.radius, 0, Math.sin(angle) * layer.radius);
+      petal.lookAt(0, 0, 0);
+      flower.add(petal);
+    }
+  });
+
+  // Add center
+  const center = new THREE.Mesh(
+    new THREE.SphereGeometry(0.25, 16, 16),
+    new THREE.MeshStandardMaterial({ color: 0xffcc33 })
+  );
+  center.position.y = 0.2;
+  flower.add(center);
+
+  // Add stem
   const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.03, 0.03, 0.8, 8),
+    new THREE.CylinderGeometry(0.05, 0.05, 1.2),
     new THREE.MeshPhongMaterial({ color: 0x3aa56a })
   );
-  stem.position.y = 0.4;
+  stem.position.y = -0.6;
+  flower.add(stem);
 
-  const blossom = new THREE.Mesh(
-    new THREE.SphereGeometry(0.2, 16, 16),
-    new THREE.MeshPhongMaterial({
-      color: colors[Math.floor(Math.random() * colors.length)],
-      emissiveIntensity: 0.8,
-      emissive: 0xff66cc
-    })
-  );
-  blossom.position.y = 0.9;
-
-  const group = new THREE.Group();
-  group.add(stem);
-  group.add(blossom);
+  group.add(flower);
   group.position.set(x, y, z);
-
   scene.add(group);
   flowers.push(group);
 }
@@ -87,7 +148,9 @@ function animate() {
     const t = Date.now() * 0.001 + i;
     f.children[1].scale.setScalar(1 + 0.2 * Math.sin(t));
   });
-
+  
+  waterTex.offset.x += 0.002;
+  
   renderer.render(scene, camera);
 }
 
