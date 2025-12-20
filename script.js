@@ -59,25 +59,46 @@ let renderTargets = [
 /* =======================
    INPUT EVENTS
 ======================= */
+
+// Smooth ambient movement
 window.addEventListener("mousemove", (e) => {
   if (isTouchScreen) return;
   targetPointer.x = e.pageX / window.innerWidth;
   targetPointer.y = e.pageY / window.innerHeight;
 });
 
-window.addEventListener("click", () => {
+// CLICK → place flower EXACTLY where clicked
+window.addEventListener("click", (e) => {
   hideTitleOnce();
+
+  const x = e.pageX / window.innerWidth;
+  const y = e.pageY / window.innerHeight;
+
+  targetPointer.x = x;
+  targetPointer.y = y;
+  pointer.x = x;
+  pointer.y = y;
+
   pointer.clicked = true;
 });
 
+// TOUCH → same behavior
 window.addEventListener("touchstart", (e) => {
   hideTitleOnce();
   isTouchScreen = true;
-  targetPointer.x = e.targetTouches[0].pageX / window.innerWidth;
-  targetPointer.y = e.targetTouches[0].pageY / window.innerHeight;
+
+  const x = e.targetTouches[0].pageX / window.innerWidth;
+  const y = e.targetTouches[0].pageY / window.innerHeight;
+
+  targetPointer.x = x;
+  targetPointer.y = y;
+  pointer.x = x;
+  pointer.y = y;
+
   pointer.clicked = true;
 });
 
+// Clear canvas
 cleanBtn.addEventListener("click", () => {
   pointer.vanishCanvas = true;
   setTimeout(() => {
@@ -99,9 +120,7 @@ function updateSize() {
   renderTargets[1].setSize(window.innerWidth, window.innerHeight);
 }
 
-window.addEventListener("resize", () => {
-  updateSize();
-});
+window.addEventListener("resize", updateSize);
 
 /* =======================
    LOAD SHADERS
@@ -139,7 +158,7 @@ async function loadShaders() {
    RENDER LOOP
 ======================= */
 function render() {
-  /* Smooth easing (museum pacing) */
+  // Smooth easing (museum pacing)
   const ease = 0.02;
   pointer.x += (targetPointer.x - pointer.x) * ease;
   pointer.y += (targetPointer.y - pointer.y) * ease;
@@ -182,5 +201,6 @@ function render() {
    START
 ======================= */
 loadShaders();
+
 
 
