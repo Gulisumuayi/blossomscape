@@ -52,7 +52,6 @@ https://gulisumuayi.github.io/blossomscape/
 One potential future improvement for this project would be to extend the current screen-space implementation into a true three-dimensional environment. While the current version uses a fake depth illusion to vary the apparent size of flowers, a 3D implementation could allow flowers to exist at different positions in 3D space, with a movable camera and perspective-based depth.
 
 Additional improvements could include adding subtle environmental motion, such as wind affecting stems, or allowing users to navigate through the scene rather than interacting from a fixed viewpoint. More variation in flower shapes and growth patterns could also be explored to further enhance visual diversity.
-
 These extensions were not implemented in the current version due to time constraints, but the project was designed in a way that would allow future expansion into a fully three-dimensional scene.
 ---
 ## Acknowledgments
