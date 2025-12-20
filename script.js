@@ -1,175 +1,122 @@
-// script.js
-import * as THREE from 'https://unpkg.com/three@0.152.2/build/three.module.js';
-import { PointerLockControls } from 'https://unpkg.com/three@0.152.2/examples/jsm/controls/PointerLockControls.js';
+import * as THREE from "https://cdn.skypack.dev/three@0.133.1/build/three.module";
 
-const canvas = document.querySelector('#canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setPixelRatio(window.devicePixelRatio);
+const canvasEl = document.querySelector("#canvas");
+const cleanBtn = document.querySelector(".clean-btn");
 
-const scene = new THREE.Scene();
+const pointer = {
+    x: .66,
+    y: .3,
+    clicked: true,
+};
 
-// Gradient sky
-const skyCanvas = document.createElement('canvas');
-skyCanvas.width = 2;
-skyCanvas.height = 2;
-const ctx = skyCanvas.getContext('2d');
-const gradient = ctx.createLinearGradient(0, 0, 0, 2);
-gradient.addColorStop(0, '#1a1a2e');
-gradient.addColorStop(1, '#3c3c6e');
-ctx.fillStyle = gradient;
-ctx.fillRect(0, 0, 2, 2);
-scene.background = new THREE.CanvasTexture(skyCanvas);
+// for codepen preview
+window.setTimeout(() => {
+    pointer.x = .75;
+    pointer.y = .5;
+    pointer.clicked = true;
+}, 700);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-camera.position.set(0, 2, 8);
 
-const controls = new PointerLockControls(camera, document.body);
-scene.add(controls.getObject());
+let basicMaterial, shaderMaterial;
+let renderer = new THREE.WebGLRenderer({
+    canvas: canvasEl,
+    alpha: true,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+let sceneShader = new THREE.Scene();
+let sceneBasic = new THREE.Scene();
+let camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+let clock = new THREE.Clock();
 
-const light = new THREE.DirectionalLight(0xffffff, 1);
-light.position.set(5, 10, 5);
-scene.add(light);
-scene.add(new THREE.AmbientLight(0x444444));
+let renderTargets = [
+    new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
+    new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight)
+];
 
-// Ground
-const groundGeo = new THREE.PlaneGeometry(100, 100);
-const groundMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
-const ground = new THREE.Mesh(groundGeo, groundMat);
-ground.rotation.x = -Math.PI / 2;
-scene.add(ground);
+createPlane();
+updateSize();
 
-// River
-const waterTex = new THREE.TextureLoader().load('https://threejsfundamentals.org/threejs/resources/images/water.jpg');
-waterTex.wrapS = waterTex.wrapT = THREE.RepeatWrapping;
-waterTex.repeat.set(4, 1);
+window.addEventListener("resize", () => {
+    updateSize();
+    cleanCanvas();
+});
 
-const riverMat = new THREE.MeshPhongMaterial({ map: waterTex, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
-const river = new THREE.Mesh(new THREE.PlaneGeometry(40, 6), riverMat);
-river.rotation.x = -Math.PI / 2;
-river.position.set(-10, 0.011, 0);
-scene.add(river);
+render();
 
-// Flower creation
-const flowers = [];
-const colors = [0xff99dd, 0xffdd66, 0x99ddff, 0xccffcc];
-function createFlower(x, y, z) {
-  const group = new THREE.Group();
-  const shape = new THREE.Shape();
-  shape.moveTo(0, 0);
-  shape.bezierCurveTo(0.5, 1.5, 1.5, 1.5, 0, 3);
-  shape.bezierCurveTo(-1.5, 1.5, -0.5, 1.5, 0, 0);
+let isTouchScreen = false;
 
-  const extrudeSettings = { depth: 0.1, bevelEnabled: false };
-  const petalGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-  const petalMat = new THREE.MeshPhongMaterial({
-    color: colors[Math.floor(Math.random() * colors.length)],
-    side: THREE.DoubleSide
-  });
+window.addEventListener("click", e => {
+  if (!isTouchScreen) {
+    pointer.x = e.pageX / window.innerWidth;
+    pointer.y = e.pageY / window.innerHeight;
+    pointer.clicked = true;   
+  }
+});
+window.addEventListener("touchstart", e => {
+  isTouchScreen = true;
+   pointer.x = e.targetTouches[0].pageX / window.innerWidth;
+  pointer.y = e.targetTouches[0].pageY / window.innerHeight;
+  pointer.clicked = true;
+});
 
-  const flower = new THREE.Group();
-  const layers = [
-    { count: 5, radius: 1.2 },
-    { count: 4, radius: 0.8, scale: 0.8, offset: Math.PI / 4 }
-  ];
+cleanBtn.addEventListener("click", cleanCanvas);
 
-  layers.forEach(layer => {
-    for (let i = 0; i < layer.count; i++) {
-      const angle = (2 * Math.PI * i) / layer.count + (layer.offset || 0);
-      const petal = new THREE.Mesh(petalGeom, petalMat);
-      petal.scale.setScalar(layer.scale || 1);
-      petal.position.set(Math.cos(angle) * layer.radius, 0, Math.sin(angle) * layer.radius);
-      petal.lookAt(0, 0, 0);
-      flower.add(petal);
-    }
-  });
-
-  const center = new THREE.Mesh(
-    new THREE.SphereGeometry(0.25, 16, 16),
-    new THREE.MeshStandardMaterial({ color: 0xffcc33 })
-  );
-  center.position.y = 0.2;
-  flower.add(center);
-
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.05, 1.2),
-    new THREE.MeshPhongMaterial({ color: 0x3aa56a })
-  );
-  stem.position.y = -0.6;
-  flower.add(stem);
-
-  group.add(flower);
-  group.position.set(x, y, z);
-  scene.add(group);
-  flowers.push(group);
+function cleanCanvas() {
+    pointer.vanishCanvas = true;
+    setTimeout(() => {
+        pointer.vanishCanvas = false;
+    }, 50);
 }
 
-// Raycasting
-const raycaster = new THREE.Raycaster();
-const mouse = new THREE.Vector2();
-canvas.addEventListener('click', (e) => {
-  if (!controls.isLocked) return;
-  mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-  raycaster.setFromCamera(mouse, camera);
-  const hit = raycaster.intersectObject(ground);
-  if (hit.length) createFlower(hit[0].point.x, 0, hit[0].point.z);
-});
-
-// Movement
-const move = { forward: false, backward: false, left: false, right: false };
-const velocity = new THREE.Vector3();
-const speed = 4.0;
-const clock = new THREE.Clock();
-
-document.addEventListener('keydown', (e) => {
-  if (e.code === 'KeyW') move.forward = true;
-  if (e.code === 'KeyS') move.backward = true;
-  if (e.code === 'KeyA') move.left = true;
-  if (e.code === 'KeyD') move.right = true;
-});
-document.addEventListener('keyup', (e) => {
-  if (e.code === 'KeyW') move.forward = false;
-  if (e.code === 'KeyS') move.backward = false;
-  if (e.code === 'KeyA') move.left = false;
-  if (e.code === 'KeyD') move.right = false;
-});
-document.body.addEventListener('click', () => controls.lock());
-
-// Resize
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  const delta = clock.getDelta();
-  velocity.set(0, 0, 0);
-  if (move.forward) velocity.z -= speed * delta;
-  if (move.backward) velocity.z += speed * delta;
-  if (move.left) velocity.x -= speed * delta;
-  if (move.right) velocity.x += speed * delta;
-  controls.moveRight(velocity.x);
-  controls.moveForward(velocity.z);
-
-  flowers.forEach((f, i) => {
-    const t = Date.now() * 0.001 + i;
-    const blossom = f.children[0];
-    if (blossom) {
-      blossom.children.forEach(child => {
-        if (child.type === 'Mesh' && child.geometry.type === 'ExtrudeGeometry') {
-          child.scale.setScalar(1 + 0.2 * Math.sin(t));
-        }
-      });
-    }
-  });
-
-  waterTex.offset.x += 0.002;
-  renderer.render(scene, camera);
+function createPlane() {
+    shaderMaterial = new THREE.ShaderMaterial({
+        uniforms: {
+            u_stop_time: {type: "f", value: 0.},
+            u_stop_randomizer: {type: "v2", value: new THREE.Vector2(Math.random(), Math.random())},
+            u_cursor: {type: "v2", value: new THREE.Vector2(pointer.x, pointer.y)},
+            u_ratio: {type: "f", value: window.innerWidth / window.innerHeight},
+            u_texture: {type: "t", value: null},
+            u_clean: {type: "f", value: 1.},
+        },
+        vertexShader: document.getElementById("vertexShader").textContent,
+        fragmentShader: document.getElementById("fragmentShader").textContent
+    });
+    basicMaterial = new THREE.MeshBasicMaterial();
+    const planeGeometry = new THREE.PlaneGeometry(2, 2);
+    const planeBasic = new THREE.Mesh(planeGeometry, basicMaterial);
+    const planeShader = new THREE.Mesh(planeGeometry, shaderMaterial);
+    sceneBasic.add(planeBasic);
+    sceneShader.add(planeShader);
 }
 
-animate();
+function render() {
 
+    shaderMaterial.uniforms.u_clean.value = pointer.vanishCanvas ? 0 : 1;
+    shaderMaterial.uniforms.u_texture.value = renderTargets[0].texture;
+
+    if (pointer.clicked) {
+        shaderMaterial.uniforms.u_cursor.value = new THREE.Vector2(pointer.x, 1 - pointer.y);
+        shaderMaterial.uniforms.u_stop_randomizer.value = new THREE.Vector2(Math.random(), Math.random());
+        shaderMaterial.uniforms.u_stop_time.value = 0.;
+        pointer.clicked = false;
+    }
+    shaderMaterial.uniforms.u_stop_time.value += clock.getDelta();
+
+
+    renderer.setRenderTarget(renderTargets[1]);
+    renderer.render(sceneShader, camera);
+    basicMaterial.map = renderTargets[1].texture;
+    renderer.setRenderTarget(null);
+    renderer.render(sceneBasic, camera);
+
+    let tmp = renderTargets[0];
+    renderTargets[0] = renderTargets[1];
+    renderTargets[1] = tmp;
+
+    requestAnimationFrame(render);
+}
+
+function updateSize() {
+    shaderMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
+    renderer.setSize(window.innerWidth, window.innerHeight);
+}
