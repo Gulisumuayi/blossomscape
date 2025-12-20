@@ -1,15 +1,23 @@
 import * as THREE from "https://cdn.skypack.dev/three@0.133.1/build/three.module.js";
 
-/* =======================
-   DOM ELEMENTS
-======================= */
+/* =============
+   DOM
+============ */
 const canvasEl = document.querySelector("#canvas");
 const cleanBtn = document.querySelector(".clean-btn");
 const titleEl = document.querySelector(".name");
 
-/* =======================
-   INTERACTION STATE
+/* ====================
+   AMBIENT AUDIO
 ======================= */
+const audio = new Audio("ambient.mp3");
+audio.loop = true;
+audio.volume = 0.3;
+let audioStarted = false;
+
+/* =================
+   INTERACTION STATE
+================== */
 const pointer = {
   x: 0.66,
   y: 0.3,
@@ -25,19 +33,20 @@ const targetPointer = {
 let hasInteracted = false;
 let isTouchScreen = false;
 
-/* =======================
-   UI HELPERS
-======================= */
+/* ========
+   UI
+============== */
 function hideTitleOnce() {
   if (hasInteracted) return;
   hasInteracted = true;
   titleEl.classList.add("hidden");
 }
 
-/* =======================
+/* ==============
    THREE SETUP
 ======================= */
 let basicMaterial, shaderMaterial;
+let fireflies = null; // 🔴 MUST be global
 
 const renderer = new THREE.WebGLRenderer({
   canvas: canvasEl,
@@ -56,21 +65,22 @@ let renderTargets = [
   new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
 ];
 
-/* =======================
-   INPUT EVENTS
-======================= */
-
-// Smooth ambient movement
+/* ======
+   INPUT
+========== */
 window.addEventListener("mousemove", (e) => {
   if (isTouchScreen) return;
   targetPointer.x = e.pageX / window.innerWidth;
   targetPointer.y = e.pageY / window.innerHeight;
 });
 
-// CLICK → place flower EXACTLY where clicked
 window.addEventListener("click", (e) => {
   hideTitleOnce();
 
+  if (!audioStarted) {
+    audio.play();
+    audioStarted = true;
+  }
   const x = e.pageX / window.innerWidth;
   const y = e.pageY / window.innerHeight;
 
@@ -79,10 +89,10 @@ window.addEventListener("click", (e) => {
   pointer.x = x;
   pointer.y = y;
 
+  shaderMaterial.uniforms.u_depth.value = Math.random();
   pointer.clicked = true;
 });
 
-// TOUCH → same behavior
 window.addEventListener("touchstart", (e) => {
   hideTitleOnce();
   isTouchScreen = true;
@@ -95,20 +105,18 @@ window.addEventListener("touchstart", (e) => {
   pointer.x = x;
   pointer.y = y;
 
+  shaderMaterial.uniforms.u_depth.value = Math.random();
   pointer.clicked = true;
 });
 
-// Clear canvas
 cleanBtn.addEventListener("click", () => {
   pointer.vanishCanvas = true;
-  setTimeout(() => {
-    pointer.vanishCanvas = false;
-  }, 50);
+  setTimeout(() => (pointer.vanishCanvas = false), 50);
 });
 
-/* =======================
+/* =============
    RESIZE
-======================= */
+============ */
 function updateSize() {
   if (shaderMaterial) {
     shaderMaterial.uniforms.u_ratio.value =
@@ -122,9 +130,9 @@ function updateSize() {
 
 window.addEventListener("resize", updateSize);
 
-/* =======================
+/* ===============
    LOAD SHADERS
-======================= */
+============== */
 async function loadShaders() {
   const vertex = await fetch("vertexShader.vert").then((r) => r.text());
   const fragment = await fetch("fragmentShader.frag").then((r) => r.text());
@@ -139,6 +147,7 @@ async function loadShaders() {
       u_ratio: { value: window.innerWidth / window.innerHeight },
       u_texture: { value: null },
       u_clean: { value: 1.0 },
+      u_depth: { value: 0.5 },
     },
     vertexShader: vertex,
     fragmentShader: fragment,
@@ -150,15 +159,48 @@ async function loadShaders() {
   sceneShader.add(new THREE.Mesh(plane, shaderMaterial));
   sceneBasic.add(new THREE.Mesh(plane, basicMaterial));
 
+  /* =========
+     FIREFLIES (SAFE VERSION)
+  ============ */
+  const fireflyGeometry = new THREE.BufferGeometry();
+  const fireflyCount = 500;
+  const positions = new Float32Array(fireflyCount * 3);
+
+  for (let i = 0; i < fireflyCount; i++) {
+    positions[i * 3 + 0] = (Math.random() - 0.5) * 2;
+    positions[i * 3 + 1] = (Math.random() - 0.5) * 2;
+    positions[i * 3 + 2] = 0;
+  }
+
+  fireflyGeometry.setAttribute(
+    "position",
+    new THREE.BufferAttribute(positions, 3)
+  );
+
+  const fireflyMaterial = new THREE.PointsMaterial({
+    color: 0xffffff,
+    size: 1.0,
+    transparent: true,
+    opacity: 0.7,
+  });
+
+  fireflies = new THREE.Points(fireflyGeometry, fireflyMaterial);
+  sceneBasic.add(fireflies);
+
   updateSize();
   render();
 }
 
-/* =======================
+/* ==========
    RENDER LOOP
-======================= */
+========== */
 function render() {
-  // Smooth easing (museum pacing)
+  // 🔹 animate fireflies safely
+  if (fireflies) {
+    fireflies.rotation.z += 0.0005;
+  }
+
+  // smooth easing
   const ease = 0.02;
   pointer.x += (targetPointer.x - pointer.x) * ease;
   pointer.y += (targetPointer.y - pointer.y) * ease;
@@ -197,10 +239,8 @@ function render() {
   requestAnimationFrame(render);
 }
 
-/* =======================
-   START
-======================= */
 loadShaders();
+
 
 
 
