@@ -2,17 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>BlossomScape</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Three.js Flower Shader First-Person Example</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div class="container">
-    <canvas id="canvas"></canvas>
-    <div class="clean-btn">clean the screen</div>
+  <!-- Overlay instructions for Pointer Lock -->
+  <div id="blocker">
+    <div id="instructions">
+      Click to Start<br/>
+      <span style="font-size:18px;">(WASD to move, mouse to look)</span>
+    </div>
   </div>
-  <div class="name">Click To Add Flowers</div>
-
+  <!-- Crosshair for first-person aiming -->
+  <div id="crosshair"></div>
   <script type="module" src="script.js"></script>
 </body>
 </html>
+
