@@ -1,5 +1,6 @@
-import * as THREE from 'https://cdn.skypack.dev/three@0.155.0';
-import { PointerLockControls } from 'https://cdn.skypack.dev/three@0.155.0/examples/jsm/controls/PointerLockControls.js';
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.155.0/build/three.module.js';
+import { PointerLockControls } from 'https://cdn.jsdelivr.net/npm/three@0.155.0/examples/jsm/controls/PointerLockControls.js';
+
 
 // Scene, camera, renderer
 const scene = new THREE.Scene();
