@@ -134,8 +134,8 @@ window.addEventListener("resize", updateSize);
    LOAD SHADERS
 ============== */
 async function loadShaders() {
-  const vertex = await fetch("vertexShader.vert").then((r) => r.text());
-  const fragment = await fetch("fragmentShader.frag").then((r) => r.text());
+  const vertex = await fetch("vertexShader.vert").then(r => r.text());
+  const fragment = await fetch("fragmentShader.frag").then(r => r.text());
 
   shaderMaterial = new THREE.ShaderMaterial({
     uniforms: {

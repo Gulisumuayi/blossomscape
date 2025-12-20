@@ -116,6 +116,6 @@ void main() {
     color.b *= 1.0 - (flower_back_shape * flower_front_shape);
     color *= u_clean;
 
-    gl_FragColor = vec4(color, 1.s0);
+    gl_FragColor = vec4(color, 1.0);
 }
 
