@@ -1,7 +1,7 @@
 # BlossomScape
 
 BlossomScape is an interactive, shader-based generative flower garden
-![Generated Flowers](Screenshot%202025-12-20%20at%202.40.59%20AM.png) 
+![Generated Flowers](images/generated-flowers.png)
 ---
 
 ## Description
@@ -18,7 +18,7 @@ The visual style is inspired by immersive digital art installations and focuses 
 
 ### Initial Scene
 
-![Initial Scene](Screenshot%202025-12-20%20at%202.39.56%20AM.png)
+![Initial Scene](images/initial-scene.png)
 
 This image shows the initial state of the project before interaction, with a dark background and subtle atmospheric particles.
 
@@ -26,7 +26,7 @@ This image shows the initial state of the project before interaction, with a dar
 
 ### Generated Flowers
 
-![Generated Flowers](Screenshot%202025-12-20%20at%202.40.59%20AM.png)
+![Generated Flowers](images/generated-flowers.png)
 
 This image shows multiple procedurally generated flowers after user interaction. Each flower has a unique size, color variation, and growth pattern.
 
