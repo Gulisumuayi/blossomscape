@@ -17,7 +17,8 @@ The visual style is inspired by immersive digital art installations and focuses 
 ---
 
 ## Visuals
-<img width="754" height="541" alt="initial-scene" src="https://github.com/user-attachments/assets/4cd9516e-3175-4201-86bd-8d5413af5082" />
+<img width="1598" height="844" alt="generated-flowers" src="https://github.com/user-attachments/assets/2cbedd23-5f8f-4b2c-a5e3-da015261cbf1" />
+
 <img width="754" height="541" alt="initial-scene" src="https://github.com/user-attachments/assets/ea1c4ead-112b-4c34-9a04-60e91218e384" />
 
 
