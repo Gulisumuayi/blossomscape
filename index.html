@@ -9,6 +9,39 @@
   <div class="ui">Click to grow flowers. Use W A S D + mouse to move.</div>
   <canvas id="canvas"></canvas>
 
+  <!-- Vertex Shader -->
+  <script type="x-shader/x-vertex" id="flowerVertexShader">
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  </script>
+
+  <!-- Fragment Shader -->
+  <script type="x-shader/x-fragment" id="flowerFragmentShader">
+    uniform float u_ratio;
+    uniform vec2  u_cursor;
+    uniform float u_stop_time;
+    uniform vec2  u_stop_randomizer;
+    varying vec2  vUv;
+
+    void main() {
+      vec3 color = vec3(0.0);
+      float stem_shape = 0.0;
+      float flower_back_shape = 0.0;
+      float flower_front_shape = 0.0;
+
+      float dist = distance(vUv, u_cursor);
+      flower_front_shape = smoothstep(0.2, 0.1, dist);
+
+      color += flower_front_shape * vec3(1.0, 0.4, 0.7);
+      float alpha = clamp(stem_shape + flower_back_shape + flower_front_shape, 0.0, 1.0);
+
+      gl_FragColor = vec4(color, alpha);
+    }
+  </script>
+
   <script type="module" src="script.js"></script>
 </body>
 </html>
