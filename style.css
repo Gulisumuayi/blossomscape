@@ -16,13 +16,10 @@ canvas {
   position: fixed;
   top: 20px;
   left: 20px;
-  background: rgba(0,0,0,0.4);
-  padding: 8px 12px;
-  border-radius: 6px;
-  color: #fff;
+  color: white;
   font-family: sans-serif;
-  font-size: 16px;
+  font-size: 18px;
   z-index: 1;
   user-select: none;
+  pointer-events: none;
 }
-
