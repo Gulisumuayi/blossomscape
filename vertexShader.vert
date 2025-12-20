@@ -1,8 +1,4 @@
-#ifdef GL_ES
-precision highp float;
-#endif
-
-// Vertex shader: pass UVs to fragment
+// Vertex shader: pass through UVs
 varying vec2 vUv;
 void main() {
   vUv = uv;
