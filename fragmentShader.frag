@@ -1,80 +1,117 @@
-// Fragment shader: procedural flower (inspired by Ksenia Kondrashova's shader:contentReference[oaicite:4]{index=4})
 #define PI 3.14159265359
 
 uniform float u_ratio;
-uniform float u_moving;
-uniform float u_stop_time;
-uniform float u_speed;
-uniform vec2 u_stop_randomizer;
-uniform float u_clean;
 uniform vec2 u_cursor;
+uniform float u_stop_time;
+uniform float u_clean;
+uniform vec2 u_stop_randomizer;
 uniform sampler2D u_texture;
+
 varying vec2 vUv;
 
-// Utility: random noise
-float rand(vec2 n) {
-  return fract(sin(dot(n, vec2(12.9898, 4.1414))) * 43758.5453);
-}
-float noise(vec2 n) {
-  const vec2 d = vec2(0.0, 1.0);
-  vec2 b = floor(n);
-  vec2 f = smoothstep(vec2(0.0), vec2(1.0), fract(n));
-  return mix(mix(rand(b), rand(b + d.yx), f.x),
-             mix(rand(b + d.xy), rand(b + d.yy), f.x), f.y);
+// --------------------------------
+// 2D noise
+
+vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+
+float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+    vec2 i = floor(v + dot(v, C.yy));
+    vec2 x0 = v - i + dot(i, C.xx);
+    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod289(i);
+    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
+    vec3 m = max(0.5 - vec3(dot(x0, x0), dot(x12.xy, x12.xy), dot(x12.zw, x12.zw)), 0.0);
+    m = m * m;
+    m = m * m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
+    vec3 g;
+    g.x = a0.x * x0.x + h.x * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
 }
 
-// Flower shape function
-float flower_shape(vec2 _pt, float _size, float _outline, float _thickness, float _noise, float _angle_offset) {
-  float rnd = noise(vUv);
-  // Petal configuration
-  float petals = 5.0 + floor(u_stop_randomizer.x * 4.0);
-  // Animate petal angle slightly over time
-  float angle_offset = 0.7 * (rnd - 0.5) / (0.2 + 30.0 * u_stop_time);
-  float angle = atan(_pt.y, _pt.x) - angle_offset;
-  // Sector shape for petals
-  float petal_shape = abs(sin(angle * 0.5 * petals + _angle_offset)) + _thickness * 0.5;
-  // Radial shape for flower (radius varies with noise and petal count)
-  vec2 sizeRange = vec2(4.0, 18.0);
-  float radial = length(_pt) * (sizeRange.x + sizeRange.y * u_stop_randomizer.x);
-  float radius_noise = sin(angle * 13.0 + 15.0 * rnd);
-  radial += _noise * radius_noise;
-  // Grow effect over time (rapidly reaches full size)
-  float grow = min(20000.0 * u_stop_time, 1.0);
-  grow = 1.0 / grow;
-  // Combine to form the flower shape mask (0 to 1)
-  float shape = 1.0 - smoothstep(0.0, _size * petal_shape, _outline * grow * radial);
-  // Hide flower if moving
-  shape *= (1.0 - u_moving);
-  // Stop drawing once time >= 1 (flower finalized)
-  shape *= (1.0 - step(1.0, u_stop_time));
-  return shape;
+float get_flower_shape(vec2 _p, float _pet_n, float _angle, float _outline) {
+    _angle *= 3.0;
+    _p = vec2(_p.x * cos(_angle) - _p.y * sin(_angle),
+              _p.x * sin(_angle) + _p.y * cos(_angle));
+    float a = atan(_p.y, _p.x);
+    float flower_sectoral_shape = pow(abs(sin(a * _pet_n)), 0.4) + 0.25;
+    vec2 flower_size_range = vec2(0.03, 0.1);
+    float size = flower_size_range[0] + u_stop_randomizer[0] * flower_size_range[1];
+    float flower_radial_shape = pow(length(_p) / size, 2.0);
+    flower_radial_shape -= 0.1 * sin(8.0 * a);
+    flower_radial_shape = max(0.1, flower_radial_shape);
+    flower_radial_shape += smoothstep(0.0, 0.03, -_p.y + 0.2 * abs(_p.x));
+    float grow_time = step(0.25, u_stop_time) * pow(u_stop_time, 0.3);
+    float flower_shape = 1.0 - smoothstep(0.0, flower_sectoral_shape, _outline * flower_radial_shape / grow_time);
+    flower_shape *= (1.0 - step(1.0, grow_time));
+    return flower_shape;
+}
+
+float get_stem_shape(vec2 _p, vec2 _uv, float _w, float _angle) {
+    _w = max(0.004, _w);
+    float x_offset = _p.y * sin(_angle);
+    x_offset *= pow(3.0 * _uv.y, 2.0);
+    _p.x -= x_offset;
+    float noise_power = 0.5;
+    float cursor_horizontal_noise = noise_power * snoise(2.0 * _uv * u_stop_randomizer[0]);
+    cursor_horizontal_noise *= pow(dot(_p.y, _p.y), 0.6);
+    cursor_horizontal_noise *= pow(dot(_uv.y, _uv.y), 0.3);
+    _p.x += cursor_horizontal_noise;
+    float left = smoothstep(-_w, 0.0, _p.x);
+    float right = 1.0 - smoothstep(0.0, _w, _p.x);
+    float stem_shape = left * right;
+    float grow_time = 1.0 - smoothstep(0.0, 0.2, u_stop_time);
+    float stem_top_mask = smoothstep(0.0, pow(grow_time, 0.5), 0.03 - _p.y);
+    stem_shape *= stem_top_mask;
+    stem_shape *= (1.0 - step(0.17, u_stop_time));
+    return stem_shape;
 }
 
 void main() {
-  // Base color from the previous texture (background)
-  vec3 base = texture2D(u_texture, vUv).rgb;
-  // Coordinate of current fragment relative to cursor (center of flower)
-  vec2 pt = vUv - u_cursor;
-  pt.x *= u_ratio;  // correct aspect ratio
+    vec3 base = texture2D(u_texture, vUv).xyz;
+    vec2 uv = vUv;
+    uv.x *= u_ratio;
+    vec2 cursor = vUv - u_cursor.xy;
+    cursor.x *= u_ratio;
+    vec3 stem_color = vec3(0.1 + u_stop_randomizer[0] * 0.6, 0.6, 0.2);
+    vec3 flower_color = vec3(0.6 + 0.5 * u_stop_randomizer[1], 0.1, 0.9 - 0.5 * u_stop_randomizer[1]);
+    float angle = 0.5 * (u_stop_randomizer[0] - 0.5);
 
-  // === Stem (small circle at cursor when moving) ===
-  vec3 stem_color = vec3(0.0, 2.0, 2.0);
-  float stem_radius = 0.005 * u_speed * u_moving;
-  float stem_shape = 1.0 - pow(smoothstep(0.0, stem_radius, dot(pt, pt)), 0.03);
-  vec3 stem = stem_shape * stem_color;
+    float stem_shape = get_stem_shape(cursor, uv, 0.003, angle);
+    stem_shape += get_stem_shape(cursor + vec2(0.0, 0.2 + 0.5 * u_stop_randomizer[0]), uv, 0.003, angle);
+    float stem_mask = 1.0 - get_stem_shape(cursor, uv, 0.004, angle);
+    stem_mask -= get_stem_shape(cursor + vec2(0.0, 0.2 + 0.5 * u_stop_randomizer[0]), uv, 0.004, angle);
 
-  // === Flower Petals ===
-  vec3 flower_color = vec3(0.7 + u_stop_randomizer.y, 0.8 * u_stop_randomizer.y, 2.9 + u_stop_randomizer.x * 0.6);
-  vec3 flower_main = flower_color * flower_shape(pt, 1.0, 0.96, 1.0, 0.15, 0.0);
-  vec3 flower_mask = 1.0 - vec3(flower_shape(pt, 1.05, 1.07, 1.0, 0.15, 0.0));
-  vec3 flower_center = vec3(-0.6) * flower_shape(pt, 0.15, 1.0, 2.0, 0.1, 1.9);
+    float petals_back_number = 1.0 + floor(u_stop_randomizer[0] * 2.0);
+    float angle_offset = -(2.0 * step(0.0, angle) - 1.0) * 0.1 * u_stop_time;
+    float flower_back_shape = get_flower_shape(cursor, petals_back_number, angle + angle_offset, 1.5);
+    float flower_back_mask = 1.0 - get_flower_shape(cursor, petals_back_number, angle + angle_offset, 1.6);
 
-  // Composite final color: base background through flower mask, plus flower layers
-  vec3 color = base * flower_mask + (flower_main + flower_center + stem);
-  color *= u_clean;  // (unused in this simple case, u_clean = 1)
-  // Clamp colors to create a soft palette (avoids pure blacks or oversaturated colors)
-  color = clamp(color, vec3(0.0, 0.0, 0.15), vec3(1.0, 1.0, 0.4));
+    float petals_front_number = 2.0 + floor(u_stop_randomizer[1] * 2.0);
+    float flower_front_shape = get_flower_shape(cursor, petals_front_number, angle, 1.0);
+    float flower_front_mask = 1.0 - get_flower_shape(cursor, petals_front_number, angle, 0.95);
 
-  gl_FragColor = vec4(color, 1.0);
+    vec3 color = base;
+    color *= stem_mask;
+    color *= flower_back_mask;
+    color *= flower_front_mask;
+    color += (stem_shape * stem_color);
+    color += (flower_back_shape * (flower_color + vec3(0.0, 0.8 * u_stop_time, 0.0)));
+    color += (flower_front_shape * flower_color);
+    color.r *= 1.0 - (0.5 * flower_back_shape * flower_front_shape);
+    color.b *= 1.0 - (flower_back_shape * flower_front_shape);
+    color *= u_clean;
+
+    gl_FragColor = vec4(color, 1.0);
 }
 

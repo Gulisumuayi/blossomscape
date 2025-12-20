@@ -2,26 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Three.js Flower Shader Example</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>BlossomScape</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <!-- Overlay for pointer lock instructions -->
-  <div id="blocker">
-    <div id="instructions">
-      <span style="font-size:40px">Click to Start</span><br />
-      (WASD to move, mouse to look)
-    </div>
+  <div class="container">
+    <canvas id="canvas"></canvas>
+    <div class="clean-btn">clean the screen</div>
   </div>
-  <!-- Crosshair in the center of screen (hidden until pointer lock) -->
-  <div id="crosshair">+</div>
+  <div class="name">Click To Add Flowers</div>
 
-  <!-- Three.js library and PointerLockControls script -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.153.0/examples/js/controls/PointerLockControls.js"></script>
-
-  <!-- Main application script -->
-  <script src="script.js"></script>
+  <script type="module" src="script.js"></script>
 </body>
 </html>

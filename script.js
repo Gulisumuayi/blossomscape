@@ -1,187 +1,186 @@
-let camera, scene, renderer, controls;
-let blocker, instructions, crosshair;
-let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
-let prevTime = performance.now();
-let pointerMoved = false;         // will trigger flower reset when true
-let flowerMaterial;               // will hold the ShaderMaterial for the flower
+import * as THREE from "https://cdn.skypack.dev/three@0.133.1/build/three.module.js";
 
-// Load the shader source files asynchronously, then initialize
-Promise.all([
-  fetch('vertexShader.vert').then(res => res.text()),
-  fetch('fragmentShader.frag').then(res => res.text())
-]).then(([vertSrc, fragSrc]) => {
-  init(vertSrc, fragSrc);
-  animate();
-}).catch(err => {
-  console.error('Error loading shaders:', err);
+/* =======================
+   DOM ELEMENTS
+======================= */
+const canvasEl = document.querySelector("#canvas");
+const cleanBtn = document.querySelector(".clean-btn");
+const titleEl = document.querySelector(".name");
+
+/* =======================
+   INTERACTION STATE
+======================= */
+const pointer = {
+  x: 0.66,
+  y: 0.3,
+  clicked: true,
+  vanishCanvas: false,
+};
+
+const targetPointer = {
+  x: pointer.x,
+  y: pointer.y,
+};
+
+let hasInteracted = false;
+let isTouchScreen = false;
+
+/* =======================
+   UI HELPERS
+======================= */
+function hideTitleOnce() {
+  if (hasInteracted) return;
+  hasInteracted = true;
+  titleEl.classList.add("hidden");
+}
+
+/* =======================
+   THREE SETUP
+======================= */
+let basicMaterial, shaderMaterial;
+
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvasEl,
+  alpha: true,
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+const sceneShader = new THREE.Scene();
+const sceneBasic = new THREE.Scene();
+
+const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 10);
+const clock = new THREE.Clock();
+
+let renderTargets = [
+  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
+  new THREE.WebGLRenderTarget(window.innerWidth, window.innerHeight),
+];
+
+/* =======================
+   INPUT EVENTS
+======================= */
+window.addEventListener("mousemove", (e) => {
+  if (isTouchScreen) return;
+  targetPointer.x = e.pageX / window.innerWidth;
+  targetPointer.y = e.pageY / window.innerHeight;
 });
 
-function init(vertexShaderSource, fragmentShaderSource) {
-  // Get overlay elements
-  blocker = document.getElementById('blocker');
-  instructions = document.getElementById('instructions');
-  crosshair = document.getElementById('crosshair');
+window.addEventListener("click", () => {
+  hideTitleOnce();
+  pointer.clicked = true;
+});
 
-  // Set up scene and camera
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x87CEEB);  // sky color background (light blue)
-  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-  camera.position.y = 10;  // start the camera above the ground
+window.addEventListener("touchstart", (e) => {
+  hideTitleOnce();
+  isTouchScreen = true;
+  targetPointer.x = e.targetTouches[0].pageX / window.innerWidth;
+  targetPointer.y = e.targetTouches[0].pageY / window.innerHeight;
+  pointer.clicked = true;
+});
 
-  // Lighting: hemisphere light for sky and ground
-  const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x228B22, 0.6);
-  hemiLight.position.set(0, 1, 0);
-  scene.add(hemiLight);
+cleanBtn.addEventListener("click", () => {
+  pointer.vanishCanvas = true;
+  setTimeout(() => {
+    pointer.vanishCanvas = false;
+  }, 50);
+});
 
-  // Ground plane (green)
-  const groundGeom = new THREE.PlaneGeometry(200, 200);
-  groundGeom.rotateX(-Math.PI / 2);  // make it horizontal
-  const groundMat = new THREE.MeshPhongMaterial({ color: 0x228B22 });
-  const ground = new THREE.Mesh(groundGeom, groundMat);
-  ground.position.y = 0;
-  scene.add(ground);
-
-  // Flower shader plane (placed in front of the camera)
-  const planeGeom = new THREE.PlaneGeometry(20, 20);
-  flowerMaterial = new THREE.ShaderMaterial({
-    vertexShader: vertexShaderSource,
-    fragmentShader: fragmentShaderSource,
-    uniforms: {
-      u_ratio:          { value: window.innerWidth / window.innerHeight },
-      u_moving:         { value: 0.0 },
-      u_stop_time:      { value: 0.0 },
-      u_speed:          { value: 0.0 },
-      u_stop_randomizer:{ value: new THREE.Vector2(Math.random(), Math.random()) },
-      u_clean:          { value: 1.0 },
-      u_cursor:         { value: new THREE.Vector2(0.5, 0.6) },  // cursor at center-ish
-      u_texture:        { value: null }
-    }
-  });
-  // Provide a base texture (black) for u_texture
-  const baseColor = new Uint8Array([0, 0, 0, 255]);  // opaque black pixel
-  const baseTexture = new THREE.DataTexture(baseColor, 1, 1);
-  baseTexture.needsUpdate = true;
-  flowerMaterial.uniforms.u_texture.value = baseTexture;
-  flowerMaterial.side = THREE.DoubleSide;  // render both front and back of the plane
-
-  const flowerPlane = new THREE.Mesh(planeGeom, flowerMaterial);
-  flowerPlane.position.set(0, 10, -30);    // in front of camera at same height
-  scene.add(flowerPlane);
-
-  // Renderer setup
-  renderer = new THREE.WebGLRenderer();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.body.appendChild(renderer.domElement);
-
-  // PointerLock controls setup
-  controls = new THREE.PointerLockControls(camera, document.body);
-  // Show/hide UI on lock/unlock
-  controls.addEventListener('lock', () => {
-    blocker.style.display = 'none';
-    crosshair.style.display = 'block';
-    // Reset and bloom a new flower when pointer lock is entered
-    pointerMoved = true;
-  });
-  controls.addEventListener('unlock', () => {
-    blocker.style.display = 'flex';
-    instructions.style.display = '';
-    crosshair.style.display = 'none';
-  });
-  // Lock pointer on click
-  instructions.addEventListener('click', () => {
-    controls.lock();
-  });
-  // Add the controls object to the scene (so camera's movement is handled by controls)
-  scene.add(controls.getObject());
-
-  // Movement controls (WASD)
-  document.addEventListener('keydown', (event) => {
-    switch (event.code) {
-      case 'KeyW':
-      case 'ArrowUp':
-        moveForward = true;
-        break;
-      case 'KeyA':
-      case 'ArrowLeft':
-        moveLeft = true;
-        break;
-      case 'KeyS':
-      case 'ArrowDown':
-        moveBackward = true;
-        break;
-      case 'KeyD':
-      case 'ArrowRight':
-        moveRight = true;
-        break;
-    }
-  }, false);
-  document.addEventListener('keyup', (event) => {
-    switch (event.code) {
-      case 'KeyW':
-      case 'ArrowUp':
-        moveForward = false;
-        break;
-      case 'KeyA':
-      case 'ArrowLeft':
-        moveLeft = false;
-        break;
-      case 'KeyS':
-      case 'ArrowDown':
-        moveBackward = false;
-        break;
-      case 'KeyD':
-      case 'ArrowRight':
-        moveRight = false;
-        break;
-    }
-  }, false);
-
-  // Handle window resize
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    // update aspect ratio uniform
-    if (flowerMaterial) {
-      flowerMaterial.uniforms.u_ratio.value = window.innerWidth / window.innerHeight;
-    }
-  });
-}
-
-function animate() {
-  requestAnimationFrame(animate);
-
-  const time = performance.now();
-  if (controls.isLocked === true) {
-    const delta = (time - prevTime) / 1000;
-
-    // Update movement: move camera based on keys
-    const moveSpeed = 100.0; // units per second for movement
-    if (moveForward) controls.moveForward(moveSpeed * delta);
-    if (moveBackward) controls.moveForward(-moveSpeed * delta);
-    if (moveLeft) controls.moveRight(-moveSpeed * delta);
-    if (moveRight) controls.moveRight(moveSpeed * delta);
-
-    // Update flower shader uniforms (simulate "cursor" movement effect)
-    if (pointerMoved) {
-      // A new "stop" event – reset time and randomize flower parameters
-      flowerMaterial.uniforms.u_moving.value = 1.0;
-      flowerMaterial.uniforms.u_stop_randomizer.value.set(Math.random(), Math.random());
-      flowerMaterial.uniforms.u_stop_time.value = 0.0;
-      pointerMoved = false;
-    } else {
-      flowerMaterial.uniforms.u_moving.value = 0.0;
-    }
-    // Advance time uniform for the flower growth animation
-    flowerMaterial.uniforms.u_stop_time.value += delta;
-    // (u_speed could be set to player movement speed if desired; here we keep it at 0)
-    flowerMaterial.uniforms.u_speed.value = 0.0;
-  } else {
-    // If not locked, we don't update movement or time (pause the scene)
-    prevTime = time;
+/* =======================
+   RESIZE
+======================= */
+function updateSize() {
+  if (shaderMaterial) {
+    shaderMaterial.uniforms.u_ratio.value =
+      window.innerWidth / window.innerHeight;
   }
 
-  prevTime = time;
-  renderer.render(scene, camera);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderTargets[0].setSize(window.innerWidth, window.innerHeight);
+  renderTargets[1].setSize(window.innerWidth, window.innerHeight);
 }
+
+window.addEventListener("resize", () => {
+  updateSize();
+});
+
+/* =======================
+   LOAD SHADERS
+======================= */
+async function loadShaders() {
+  const vertex = await fetch("vertexShader.vert").then((r) => r.text());
+  const fragment = await fetch("fragmentShader.frag").then((r) => r.text());
+
+  shaderMaterial = new THREE.ShaderMaterial({
+    uniforms: {
+      u_stop_time: { value: 0.0 },
+      u_stop_randomizer: {
+        value: new THREE.Vector2(Math.random(), Math.random()),
+      },
+      u_cursor: { value: new THREE.Vector2(pointer.x, pointer.y) },
+      u_ratio: { value: window.innerWidth / window.innerHeight },
+      u_texture: { value: null },
+      u_clean: { value: 1.0 },
+    },
+    vertexShader: vertex,
+    fragmentShader: fragment,
+  });
+
+  basicMaterial = new THREE.MeshBasicMaterial();
+
+  const plane = new THREE.PlaneGeometry(2, 2);
+  sceneShader.add(new THREE.Mesh(plane, shaderMaterial));
+  sceneBasic.add(new THREE.Mesh(plane, basicMaterial));
+
+  updateSize();
+  render();
+}
+
+/* =======================
+   RENDER LOOP
+======================= */
+function render() {
+  /* Smooth easing (museum pacing) */
+  const ease = 0.02;
+  pointer.x += (targetPointer.x - pointer.x) * ease;
+  pointer.y += (targetPointer.y - pointer.y) * ease;
+
+  shaderMaterial.uniforms.u_clean.value = pointer.vanishCanvas ? 0.0 : 1.0;
+  shaderMaterial.uniforms.u_texture.value = renderTargets[0].texture;
+
+  if (pointer.clicked) {
+    shaderMaterial.uniforms.u_cursor.value = new THREE.Vector2(
+      pointer.x,
+      1.0 - pointer.y
+    );
+    shaderMaterial.uniforms.u_stop_randomizer.value = new THREE.Vector2(
+      Math.random(),
+      Math.random()
+    );
+    shaderMaterial.uniforms.u_stop_time.value = 0.0;
+    pointer.clicked = false;
+  }
+
+  shaderMaterial.uniforms.u_stop_time.value += clock.getDelta();
+
+  renderer.setRenderTarget(renderTargets[1]);
+  renderer.render(sceneShader, camera);
+
+  basicMaterial.map = renderTargets[1].texture;
+
+  renderer.setRenderTarget(null);
+  renderer.render(sceneBasic, camera);
+
+  [renderTargets[0], renderTargets[1]] = [
+    renderTargets[1],
+    renderTargets[0],
+  ];
+
+  requestAnimationFrame(render);
+}
+
+/* =======================
+   START
+======================= */
+loadShaders();
+
 
